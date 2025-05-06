@@ -87,7 +87,7 @@ jobs:
           path: zed
 
       - name: Install Linux dependencies
-        run: ./script/linux && ./script/install-mold 2.34.0
+        run: ./zed/script/linux && ./zed/script/install-mold 2.34.0
 
       - name: Install rust nightly
         uses: dtolnay/rust-toolchain@stable
