@@ -1,0 +1,151 @@
+diff --git a/crates/proto/src/typed_envelope.rs b/crates/proto/src/typed_envelope.rs
+index 0741b5a610..5b116b0f1e 100644
+--- a/crates/proto/src/typed_envelope.rs
++++ b/crates/proto/src/typed_envelope.rs
+@@ -1,5 +1,5 @@
+ use crate::{Envelope, PeerId};
+-use anyhow::{Result, anyhow};
++use anyhow::{anyhow, Result};
+ use serde::Serialize;
+ use std::{
+     any::{Any, TypeId},
+@@ -130,7 +130,8 @@ pub trait ToProto {
+ impl FromProto for PathBuf {
+     #[cfg(target_os = "windows")]
+     fn from_proto(proto: String) -> Self {
+-        proto.split("/").collect()
++        // proto.split("/").collect()
++        PathBuf::from(proto)
+     }
+ 
+     #[cfg(not(target_os = "windows"))]
+@@ -148,8 +149,15 @@ impl FromProto for Arc<Path> {
+ impl ToProto for PathBuf {
+     #[cfg(target_os = "windows")]
+     fn to_proto(self) -> String {
++        use std::path::Component;
+         self.components()
+-            .map(|comp| comp.as_os_str().to_string_lossy().to_string())
++            .map(|comp| {
++                if comp == Component::RootDir {
++                    "".to_string()
++                } else {
++                    comp.as_os_str().to_string_lossy().to_string()
++                }
++            })
+             .collect::<Vec<_>>()
+             .join("/")
+     }
+@@ -163,8 +171,15 @@ impl ToProto for PathBuf {
+ impl ToProto for &Path {
+     #[cfg(target_os = "windows")]
+     fn to_proto(self) -> String {
++        use std::path::Component;
+         self.components()
+-            .map(|comp| comp.as_os_str().to_string_lossy().to_string())
++            .map(|comp| {
++                if comp == Component::RootDir {
++                    "".to_string()
++                } else {
++                    comp.as_os_str().to_string_lossy().to_string()
++                }
++            })
+             .collect::<Vec<_>>()
+             .join("/")
+     }
+diff --git a/crates/remote/src/ssh_session.rs b/crates/remote/src/ssh_session.rs
+index 8dad4780fb..8e02531abc 100644
+--- a/crates/remote/src/ssh_session.rs
++++ b/crates/remote/src/ssh_session.rs
+@@ -384,16 +384,16 @@ impl SshSocket {
+             .stdin(Stdio::piped())
+             .stdout(Stdio::piped())
+             .stderr(Stdio::piped())
+-            .args(["-o", "ControlMaster=no", "-o"])
+-            .arg(format!("ControlPath={}", self.socket_path.display()))
++            // .args(["-o", "ControlMaster=no", "-o"])
++            // .arg(format!("ControlPath={}", self.socket_path.display()))
+     }
+ 
+     fn ssh_args(&self) -> Vec<String> {
+         vec![
+-            "-o".to_string(),
+-            "ControlMaster=no".to_string(),
+-            "-o".to_string(),
+-            format!("ControlPath={}", self.socket_path.display()),
++            // "-o".to_string(),
++            // "ControlMaster=no".to_string(),
++            // "-o".to_string(),
++            // format!("ControlPath={}", self.socket_path.display()),
+             self.connection_options.ssh_url(),
+         ]
+     }
+@@ -1441,11 +1441,36 @@ impl RemoteConnection for SshRemoteConnection {
+ impl SshRemoteConnection {
+     #[cfg(not(unix))]
+     async fn new(
+-        _connection_options: SshConnectionOptions,
++        connection_options: SshConnectionOptions,
+         _delegate: Arc<dyn SshClientDelegate>,
+         _cx: &mut AsyncApp,
+     ) -> Result<Self> {
+-        Err(anyhow!("ssh is not supported on this platform"))
++        let url = connection_options.ssh_url();
++        let temp_dir = tempfile::Builder::new()
++            .prefix("zed-ssh-session")
++            .tempdir()?;
++        let master_process = util::command::new_smol_command("ssh")
++            .stdin(Stdio::null())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped())
++            .args(connection_options.additional_args())
++            .arg(&url)
++            .kill_on_drop(true)
++            .spawn()?;
++
++        //fake path
++        let socket_path = temp_dir.path().join("ssh.sock");
++        let socket = SshSocket {
++            connection_options,
++            socket_path,
++        };
++
++        Ok(Self {
++            socket,
++            master_process: Mutex::new(Some(master_process)),
++            _temp_dir: temp_dir,
++            remote_binary_path: Some(PathBuf::from(".zed_server/remote_server")),
++        })
+     }
+ 
+     #[cfg(unix)]
+diff --git a/crates/zed/src/reliability.rs b/crates/zed/src/reliability.rs
+index 6688417720..c34de8847e 100644
+--- a/crates/zed/src/reliability.rs
++++ b/crates/zed/src/reliability.rs
+@@ -54,7 +54,16 @@ pub fn init_panic_hook(
+         if *release_channel::RELEASE_CHANNEL == ReleaseChannel::Dev {
+             let location = info.location().unwrap();
+             let backtrace = Backtrace::new();
+-            eprintln!(
++            macro_rules! log_panic {
++                ($($arg:tt)*) => {
++                    if is_pty {
++                        eprintln!($($arg)*);
++                    } else {
++                        log::error!($($arg)*);
++                    }
++                };
++            }
++            log_panic!(
+                 "Thread {:?} panicked with {:?} at {}:{}:{}\n{}{:?}",
+                 thread_name,
+                 payload,
+@@ -73,6 +82,7 @@ pub fn init_panic_hook(
+                 },
+                 backtrace,
+             );
++            zlog::flush();
+             std::process::exit(-1);
+         }
+         let main_module_base_address = get_main_module_base_address();
