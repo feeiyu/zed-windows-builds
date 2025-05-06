@@ -104,10 +104,10 @@ jobs:
 
       - name: Build release
         working-directory: zed
-        run: cargo build -p remote_server --release
+        run: bash ../bundle-linux-remote
 
       - name: Archive build
         uses: actions/upload-artifact@v4
         with:
           name: zed-remote-linux
-          path: zed/target/release/zed.exe
+          path: zed/target/x86_64-unknown-linux-musl/release/remote_server
