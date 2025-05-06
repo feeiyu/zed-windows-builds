@@ -86,6 +86,9 @@ jobs:
           ref: ${{ inputs.ref }}
           path: zed
 
+      - name: Install Linux dependencies
+        run: ./script/linux && ./script/install-mold 2.34.0
+
       - name: Install rust nightly
         uses: dtolnay/rust-toolchain@stable
         with:
