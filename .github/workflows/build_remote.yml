@@ -1,0 +1,63 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: Repository to clone and build
+        type: string
+        default: zed-industries/zed
+      ref:
+        description: Branch/tag/ref to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Repository to clone and build
+        type: string
+        default: zed-industries/zed
+      ref:
+        description: Branch/tag/ref to build
+        type: string
+        default: main 
+
+jobs:
+  zed-remote-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout self
+        uses: actions/checkout@v4
+
+      - name: Checkout Zed
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          path: zed
+
+      - name: Install Linux dependencies
+        run: ./zed/script/linux && ./zed/script/install-mold 2.34.0
+
+      - name: Install rust nightly
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          override: true
+          target: wasm32-wasip1
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: zed-remote-linux
+          workspaces: "zed -> target"
+
+      - name: Build release
+        working-directory: zed
+        run: bash ../bundle-linux-remote
+
+      - name: Archive build
+        uses: actions/upload-artifact@v4
+        with:
+          name: zed-remote-linux
+          path: zed/target/x86_64-unknown-linux-musl/release/remote_server
