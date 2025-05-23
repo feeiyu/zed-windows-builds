@@ -1,14 +1,7 @@
 diff --git a/crates/proto/src/typed_envelope.rs b/crates/proto/src/typed_envelope.rs
-index 0741b5a610..5b116b0f1e 100644
+index a4d0a9bf85..de1bf701de 100644
 --- a/crates/proto/src/typed_envelope.rs
 +++ b/crates/proto/src/typed_envelope.rs
-@@ -1,5 +1,5 @@
- use crate::{Envelope, PeerId};
--use anyhow::{Result, anyhow};
-+use anyhow::{anyhow, Result};
- use serde::Serialize;
- use std::{
-     any::{Any, TypeId},
 @@ -130,7 +130,8 @@ pub trait ToProto {
  impl FromProto for PathBuf {
      #[cfg(target_os = "windows")]
@@ -54,10 +47,10 @@ index 0741b5a610..5b116b0f1e 100644
              .join("/")
      }
 diff --git a/crates/remote/src/ssh_session.rs b/crates/remote/src/ssh_session.rs
-index 8dad4780fb..8e02531abc 100644
+index 1d0e89a2ed..fb349bd7d4 100644
 --- a/crates/remote/src/ssh_session.rs
 +++ b/crates/remote/src/ssh_session.rs
-@@ -384,16 +384,16 @@ impl SshSocket {
+@@ -380,16 +380,16 @@ impl SshSocket {
              .stdin(Stdio::piped())
              .stdout(Stdio::piped())
              .stderr(Stdio::piped())
@@ -80,7 +73,7 @@ index 8dad4780fb..8e02531abc 100644
              self.connection_options.ssh_url(),
          ]
      }
-@@ -1441,11 +1441,36 @@ impl RemoteConnection for SshRemoteConnection {
+@@ -1437,11 +1437,36 @@ impl RemoteConnection for SshRemoteConnection {
  impl SshRemoteConnection {
      #[cfg(not(unix))]
      async fn new(
@@ -89,7 +82,7 @@ index 8dad4780fb..8e02531abc 100644
          _delegate: Arc<dyn SshClientDelegate>,
          _cx: &mut AsyncApp,
      ) -> Result<Self> {
--        Err(anyhow!("ssh is not supported on this platform"))
+-        anyhow::bail!("ssh is not supported on this platform");
 +        let url = connection_options.ssh_url();
 +        let temp_dir = tempfile::Builder::new()
 +            .prefix("zed-ssh-session")
@@ -120,7 +113,7 @@ index 8dad4780fb..8e02531abc 100644
  
      #[cfg(unix)]
 diff --git a/crates/zed/src/reliability.rs b/crates/zed/src/reliability.rs
-index 6688417720..c34de8847e 100644
+index 0f0e93ee7e..886d8f688a 100644
 --- a/crates/zed/src/reliability.rs
 +++ b/crates/zed/src/reliability.rs
 @@ -54,7 +54,16 @@ pub fn init_panic_hook(
