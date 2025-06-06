@@ -1,8 +1,8 @@
 diff --git a/crates/editor/src/editor.rs b/crates/editor/src/editor.rs
-index 017ebbcfb4..b53cdaa68c 100644
+index 4e3baf69ff..60ac4b432a 100644
 --- a/crates/editor/src/editor.rs
 +++ b/crates/editor/src/editor.rs
-@@ -131,6 +131,7 @@ use project::{
+@@ -133,6 +133,7 @@ use project::{
          },
          session::{Session, SessionEvent},
      },
@@ -10,7 +10,7 @@ index 017ebbcfb4..b53cdaa68c 100644
      project_settings::DiagnosticSeverity,
  };
  
-@@ -1685,6 +1686,31 @@ impl Editor {
+@@ -1760,6 +1761,31 @@ impl Editor {
                          _ => {}
                      },
                  ));
@@ -42,8 +42,23 @@ index 017ebbcfb4..b53cdaa68c 100644
              }
          }
  
+diff --git a/crates/feature_flags/src/feature_flags.rs b/crates/feature_flags/src/feature_flags.rs
+index b991f1b71c..7a6ddb51cf 100644
+--- a/crates/feature_flags/src/feature_flags.rs
++++ b/crates/feature_flags/src/feature_flags.rs
+@@ -80,6 +80,10 @@ impl FeatureFlag for NotebookFeatureFlag {
+ pub struct DebuggerFeatureFlag {}
+ impl FeatureFlag for DebuggerFeatureFlag {
+     const NAME: &'static str = "debugger";
++
++    fn enabled_for_all() -> bool {
++        true 
++    }
+ }
+ 
+ pub struct ThreadAutoCaptureFeatureFlag {}
 diff --git a/crates/git_ui/src/git_panel.rs b/crates/git_ui/src/git_panel.rs
-index 4946bd0ecd..717e7300f9 100644
+index 0d93d8aa2a..7c39ed19f3 100644
 --- a/crates/git_ui/src/git_panel.rs
 +++ b/crates/git_ui/src/git_panel.rs
 @@ -441,7 +441,7 @@ impl GitPanel {
@@ -56,7 +71,7 @@ index 4946bd0ecd..717e7300f9 100644
                  ) => {
                      this.schedule_update(*full_scan, window, cx);
 diff --git a/crates/project/src/git_store.rs b/crates/project/src/git_store.rs
-index e9eadc217d..af461a28c0 100644
+index 0be12c30cc..7d32313582 100644
 --- a/crates/project/src/git_store.rs
 +++ b/crates/project/src/git_store.rs
 @@ -292,7 +292,7 @@ pub enum RepositoryState {
@@ -68,7 +83,7 @@ index e9eadc217d..af461a28c0 100644
      MergeHeadsChanged,
  }
  
-@@ -1500,7 +1500,7 @@ impl GitStore {
+@@ -1496,7 +1496,7 @@ impl GitStore {
  
              repo.update(cx, {
                  let update = update.clone();
@@ -77,7 +92,7 @@ index e9eadc217d..af461a28c0 100644
              })?;
  
              this.active_repo_id.get_or_insert_with(|| {
-@@ -3589,7 +3589,10 @@ impl Repository {
+@@ -3594,7 +3594,10 @@ impl Repository {
                              let snapshot = this.update(&mut cx, |this, cx| {
                                  this.snapshot.branch = branch;
                                  let snapshot = this.snapshot.clone();
@@ -89,7 +104,7 @@ index e9eadc217d..af461a28c0 100644
                                  snapshot
                              })?;
                              if let Some(updates_tx) = updates_tx {
-@@ -3934,6 +3937,7 @@ impl Repository {
+@@ -3939,6 +3942,7 @@ impl Repository {
      pub(crate) fn apply_remote_update(
          &mut self,
          update: proto::UpdateRepository,
@@ -97,7 +112,7 @@ index e9eadc217d..af461a28c0 100644
          cx: &mut Context<Self>,
      ) -> Result<()> {
          let conflicted_paths = TreeSet::from_ordered_entries(
-@@ -3967,7 +3971,10 @@ impl Repository {
+@@ -3972,7 +3976,10 @@ impl Repository {
          if update.is_last_update {
              self.snapshot.scan_id = update.scan_id;
          }
@@ -109,7 +124,7 @@ index e9eadc217d..af461a28c0 100644
          Ok(())
      }
  
-@@ -4297,7 +4304,10 @@ impl Repository {
+@@ -4302,7 +4309,10 @@ impl Repository {
                                  .ok();
                          }
                      }
@@ -121,7 +136,7 @@ index e9eadc217d..af461a28c0 100644
                  })
              },
          );
-@@ -4557,7 +4567,10 @@ async fn compute_snapshot(
+@@ -4562,7 +4572,10 @@ async fn compute_snapshot(
          || branch != prev_snapshot.branch
          || statuses_by_path != prev_snapshot.statuses_by_path
      {
@@ -182,7 +197,7 @@ index a4d0a9bf85..de1bf701de 100644
              .join("/")
      }
 diff --git a/crates/remote/src/ssh_session.rs b/crates/remote/src/ssh_session.rs
-index 48ffb3000a..49485652a5 100644
+index 660e562780..d78714844e 100644
 --- a/crates/remote/src/ssh_session.rs
 +++ b/crates/remote/src/ssh_session.rs
 @@ -380,16 +380,16 @@ impl SshSocket {
