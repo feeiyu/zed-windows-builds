@@ -292,3 +292,25 @@ index ccbe57e7b3..7a0f6a19c4 100644
              std::process::exit(-1);
          }
          let main_module_base_address = get_main_module_base_address();
+diff --git a/crates/zed/src/zed.rs b/crates/zed/src/zed.rs
+index 0c284661aa..ffab72d2ea 100644
+--- a/crates/zed/src/zed.rs
++++ b/crates/zed/src/zed.rs
+@@ -20,7 +20,7 @@ use collections::VecDeque;
+ use debugger_ui::debugger_panel::DebugPanel;
+ use editor::ProposedChangesEditorToolbar;
+ use editor::{Editor, MultiBuffer, scroll::Autoscroll};
+-use feature_flags::{DebuggerFeatureFlag, FeatureFlagViewExt};
++use feature_flags::{DebuggerFeatureFlag, FeatureFlagAppExt, FeatureFlagViewExt};
+ use futures::future::Either;
+ use futures::{StreamExt, channel::mpsc, select_biased};
+ use git_ui::git_panel::GitPanel;
+@@ -496,7 +496,7 @@ fn initialize_panels(
+             chat_panel,
+             notification_panel,
+         )?;
+-
++        cx.update(|_, cx| cx.update_flags(true, Vec::new())).ok();
+         workspace_handle.update_in(cx, |workspace, window, cx| {
+             workspace.add_panel(project_panel, window, cx);
+             workspace.add_panel(outline_panel, window, cx);
