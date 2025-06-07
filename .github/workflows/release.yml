@@ -31,8 +31,9 @@ jobs:
       - name: Create release directories and zip
         run: |
           mv artifacts/zed-windows/zed.exe zed.exe
+          mv artifacts/zed-windows/zed.pdb zed.pdb
           mv artifacts/zed-remote-linux/remote_server remote_server
-          zip zed.zip -9 zed.exe remote_server
+          zip zed.zip -9 zed.exe zed.pdb remote_server
           sha256sum zed.zip > sha256sums.txt
 
       - name: Upload release build artifacts to GitHub Release
