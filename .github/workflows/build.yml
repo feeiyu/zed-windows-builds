@@ -59,7 +59,7 @@ jobs:
 
       - name: Apply windows remote patch
         working-directory: zed
-        run: git apply ../remote.patch
+        run: git apply ../remote.patch ../fix_diff_indicator.patch
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
