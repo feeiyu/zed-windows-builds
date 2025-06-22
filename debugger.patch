@@ -1,0 +1,65 @@
+diff --git a/crates/dap/src/client.rs b/crates/dap/src/client.rs
+index 22926b68cb..4c0701a469 100644
+--- a/crates/dap/src/client.rs
++++ b/crates/dap/src/client.rs
+@@ -111,10 +111,11 @@ impl DebugAdapterClient {
+             .add_pending_request(sequence_id, callback_tx);
+ 
+         log::debug!(
+-            "Client {} send `{}` request with sequence_id: {}",
++            "Client {} send `{}` request with sequence_id: {} payload: {}",
+             self.id.0,
+             R::COMMAND,
+-            sequence_id
++            sequence_id,
++            serde_json::to_string(&request).unwrap(),
+         );
+ 
+         self.send_message(Message::Request(request)).await?;
+@@ -123,10 +124,11 @@ impl DebugAdapterClient {
+ 
+         let response = callback_rx.await??;
+         log::debug!(
+-            "Client {} received response for: `{}` sequence_id: {}",
++            "Client {} received response for: `{}` sequence_id: {} payload: {}",
+             self.id.0,
+             command,
+-            sequence_id
++            sequence_id,
++            serde_json::to_string(&response).unwrap(),
+         );
+         match response.success {
+             true => {
+diff --git a/crates/debugger_ui/src/session/running/stack_frame_list.rs b/crates/debugger_ui/src/session/running/stack_frame_list.rs
+index da3674c8e2..7dd0d8187e 100644
+--- a/crates/debugger_ui/src/session/running/stack_frame_list.rs
++++ b/crates/debugger_ui/src/session/running/stack_frame_list.rs
+@@ -378,7 +378,7 @@ impl StackFrameList {
+             s.path
+                 .as_deref()
+                 .map(|path| Arc::<Path>::from(Path::new(path)))
+-                .filter(|path| path.is_absolute())
++                .filter(|path| path.is_absolute() || path.starts_with("/"))
+         })
+     }
+ 
+diff --git a/crates/worktree/src/worktree.rs b/crates/worktree/src/worktree.rs
+index 6b3a0b855f..96dd9b8dd9 100644
+--- a/crates/worktree/src/worktree.rs
++++ b/crates/worktree/src/worktree.rs
+@@ -2417,7 +2417,14 @@ impl Snapshot {
+             anyhow::bail!("invalid path");
+         }
+         if path.file_name().is_some() {
+-            Ok(self.abs_path.as_path().join(path))
++            let abs_path = self.abs_path.to_string();
++            if abs_path.starts_with("/") {
++                let path = path.to_string_lossy().replace("\\", "/");
++                let full_path = format!("{abs_path}/{path}");
++                Ok(PathBuf::from(&full_path))
++            } else {
++                Ok(self.abs_path.as_path().join(path))
++            }
+         } else {
+             Ok(self.abs_path.as_path().to_path_buf())
+         }

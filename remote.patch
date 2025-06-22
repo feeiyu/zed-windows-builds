@@ -1,3 +1,128 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 28e46d730a..c0e378607d 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -19903,6 +19903,7 @@ dependencies = [
+  "extension",
+  "extension_host",
+  "extensions_ui",
++ "feature_flags",
+  "feedback",
+  "file_finder",
+  "fs",
+diff --git a/crates/project/src/debugger/dap_store.rs b/crates/project/src/debugger/dap_store.rs
+index b54c4c1e45..d974bcd6dc 100644
+--- a/crates/project/src/debugger/dap_store.rs
++++ b/crates/project/src/debugger/dap_store.rs
+@@ -263,6 +263,7 @@ impl DapStore {
+                         binary.cwd.as_deref(),
+                         binary.envs,
+                         None,
++                        true,
+                     );
+ 
+                     Ok(DebugAdapterBinary {
+diff --git a/crates/project/src/terminals.rs b/crates/project/src/terminals.rs
+index 00e12a312f..1305e337e5 100644
+--- a/crates/project/src/terminals.rs
++++ b/crates/project/src/terminals.rs
+@@ -166,6 +166,7 @@ impl Project {
+                     path.as_deref(),
+                     env,
+                     None,
++                    false,
+                 );
+                 let mut command = std::process::Command::new(command);
+                 command.args(args);
+@@ -253,7 +254,7 @@ impl Project {
+                             .or_insert_with(|| "xterm-256color".to_string());
+ 
+                         let (program, args) =
+-                            wrap_for_ssh(&ssh_command, None, path.as_deref(), env, None);
++                            wrap_for_ssh(&ssh_command, None, path.as_deref(), env, None, false);
+                         env = HashMap::default();
+                         (
+                             Option::<TaskState>::None,
+@@ -301,6 +302,7 @@ impl Project {
+                             path.as_deref(),
+                             env,
+                             python_venv_directory.as_deref(),
++                            false,
+                         );
+                         env = HashMap::default();
+                         (
+@@ -528,6 +530,7 @@ pub fn wrap_for_ssh(
+     path: Option<&Path>,
+     env: HashMap<String, String>,
+     venv_directory: Option<&Path>,
++    run_dap: bool,
+ ) -> (String, Vec<String>) {
+     let to_run = if let Some((command, args)) = command {
+         // DEFAULT_REMOTE_SHELL is '"${SHELL:-sh}"' so must not be escaped
+@@ -572,7 +575,14 @@ pub fn wrap_for_ssh(
+     } else {
+         format!("cd; {env_changes} {to_run}")
+     };
+-    let shell_invocation = format!("sh -c {}", shlex::try_quote(&commands).unwrap());
++
++    let commands = shlex::try_quote(&commands).unwrap();
++    let commands = if !run_dap {
++        escape(commands)
++    } else {
++        commands
++    };
++    let shell_invocation = format!("sh -c {}", commands);
+ 
+     let program = "ssh".to_string();
+     let mut args = ssh_command.arguments.clone();
+@@ -582,6 +592,47 @@ pub fn wrap_for_ssh(
+     (program, args)
+ }
+ 
++pub fn escape(s: Cow<str>) -> Cow<str> {
++    let mut needs_escape = s.is_empty();
++    for ch in s.chars() {
++        match ch {
++            '"' | '\t' | '\n' | ' ' => needs_escape = true,
++            _ => {}
++        }
++    }
++    if !needs_escape {
++        return s
++    }
++    let mut es = String::with_capacity(s.len());
++    es.push('"');
++    let mut chars = s.chars().peekable();
++    loop {
++        let mut nslashes = 0;
++        while let Some(&'\\') = chars.peek() {
++            chars.next();
++            nslashes += 1;
++        }
++
++        match chars.next() {
++            Some('"') => {
++                es.extend(std::iter::repeat('\\').take(nslashes * 2 + 1));
++                es.push('"');
++            }
++            Some(c) => {
++                es.extend(std::iter::repeat('\\').take(nslashes));
++                es.push(c);
++            }
++            None => {
++                es.extend(std::iter::repeat('\\').take(nslashes * 2));
++                break;
++            }
++        }
++
++    }
++    es.push('"');
++    es.into()
++}
++
+ fn add_environment_path(env: &mut HashMap<String, String>, new_path: &Path) -> Result<()> {
+     let mut env_paths = vec![new_path.to_path_buf()];
+     if let Some(path) = env.get("PATH").or(env::var("PATH").ok().as_ref()) {
 diff --git a/crates/proto/src/typed_envelope.rs b/crates/proto/src/typed_envelope.rs
 index a4d0a9bf85..de1bf701de 100644
 --- a/crates/proto/src/typed_envelope.rs
@@ -112,6 +237,18 @@ index 660e562780..d78714844e 100644
      }
  
      #[cfg(unix)]
+diff --git a/crates/zed/Cargo.toml b/crates/zed/Cargo.toml
+index d8296c94f6..ea75dc17f8 100644
+--- a/crates/zed/Cargo.toml
++++ b/crates/zed/Cargo.toml
+@@ -65,6 +65,7 @@ git_ui.workspace = true
+ go_to_line.workspace = true
+ gpui = { workspace = true, features = ["wayland", "x11", "font-kit"] }
+ gpui_tokio.workspace = true
++feature_flags.workspace = true
+ 
+ http_client.workspace = true
+ image_viewer.workspace = true
 diff --git a/crates/zed/src/reliability.rs b/crates/zed/src/reliability.rs
 index ccbe57e7b3..7a0f6a19c4 100644
 --- a/crates/zed/src/reliability.rs
@@ -143,21 +280,20 @@ index ccbe57e7b3..7a0f6a19c4 100644
          }
          let main_module_base_address = get_main_module_base_address();
 diff --git a/crates/zed/src/zed.rs b/crates/zed/src/zed.rs
-index 0c284661aa..ffab72d2ea 100644
+index 44c88eb469..9e0560a51c 100644
 --- a/crates/zed/src/zed.rs
 +++ b/crates/zed/src/zed.rs
-@@ -20,7 +20,7 @@ use collections::VecDeque;
+@@ -20,6 +20,7 @@ use collections::VecDeque;
  use debugger_ui::debugger_panel::DebugPanel;
  use editor::ProposedChangesEditorToolbar;
  use editor::{Editor, MultiBuffer, scroll::Autoscroll};
--use feature_flags::{DebuggerFeatureFlag, FeatureFlagViewExt};
-+use feature_flags::{DebuggerFeatureFlag, FeatureFlagAppExt, FeatureFlagViewExt};
++use feature_flags::FeatureFlagAppExt;
  use futures::future::Either;
  use futures::{StreamExt, channel::mpsc, select_biased};
  use git_ui::git_panel::GitPanel;
-@@ -496,7 +496,7 @@ fn initialize_panels(
-             chat_panel,
+@@ -500,7 +501,7 @@ fn initialize_panels(
              notification_panel,
+             debug_panel,
          )?;
 -
 +        cx.update(|_, cx| cx.update_flags(true, Vec::new())).ok();
