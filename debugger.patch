@@ -1,5 +1,5 @@
 diff --git a/crates/dap/src/client.rs b/crates/dap/src/client.rs
-index 22926b68cb..4c0701a469 100644
+index 4515e2a1d7..349caa3b87 100644
 --- a/crates/dap/src/client.rs
 +++ b/crates/dap/src/client.rs
 @@ -111,10 +111,11 @@ impl DebugAdapterClient {
@@ -43,8 +43,23 @@ index da3674c8e2..7dd0d8187e 100644
          })
      }
  
+diff --git a/crates/extension_host/src/extension_host.rs b/crates/extension_host/src/extension_host.rs
+index 7c58fac1e0..6c79795179 100644
+--- a/crates/extension_host/src/extension_host.rs
++++ b/crates/extension_host/src/extension_host.rs
+@@ -1701,8 +1701,8 @@ impl ExtensionStore {
+                 )
+             })?
+             .await?;
+-            let dest_dir = PathBuf::from(&response.tmp_dir).join(missing_extension.clone().id);
+-            log::info!("Uploading extension {}", missing_extension.clone().id);
++            let dest_dir = PathBuf::from(format!("{}/{}", response.tmp_dir, missing_extension.id));
++            log::info!("Uploading extension {}", missing_extension.id);
+ 
+             client
+                 .update(cx, |client, cx| {
 diff --git a/crates/worktree/src/worktree.rs b/crates/worktree/src/worktree.rs
-index 6b3a0b855f..96dd9b8dd9 100644
+index 8c407fdd3e..9f0283b284 100644
 --- a/crates/worktree/src/worktree.rs
 +++ b/crates/worktree/src/worktree.rs
 @@ -2417,7 +2417,14 @@ impl Snapshot {
